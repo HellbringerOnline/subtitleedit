@@ -1858,8 +1858,8 @@ public partial class OcrViewModel : ObservableObject
 
                             if (result.OkPressed)
                             {
-                                var letterBitmap = letters[letterIndex].NikseBitmap;
-                                _nOcrAddHistoryManager.Add(result.NOcrChar, letterBitmap,
+                                var previewBitmap = result.PreviewBitmap ?? letters[letterIndex].NikseBitmap;
+                                _nOcrAddHistoryManager.Add(result.NOcrChar, previewBitmap,
                                     OcrSubtitleItems.IndexOf(item));
                                 IsInspectAdditionsVisible = true;
                                 _nOcrDb.Add(result.NOcrChar);
@@ -2242,8 +2242,8 @@ public partial class OcrViewModel : ObservableObject
                             {
                                 if (result.BinaryOcrBitmap != null)
                                 {
-                                    var letterBitmap = letters[letterIndex].NikseBitmap;
-                                    _binaryOcrAddHistoryManager.Add(result.BinaryOcrBitmap, letterBitmap,
+                                    var previewBitmap = result.PreviewBitmap ?? letters[letterIndex].NikseBitmap;
+                                    _binaryOcrAddHistoryManager.Add(result.BinaryOcrBitmap, previewBitmap, result.PreviewTopMargin,
                                         OcrSubtitleItems.IndexOf(item));
                                     IsInspectAdditionsVisible = true;
 

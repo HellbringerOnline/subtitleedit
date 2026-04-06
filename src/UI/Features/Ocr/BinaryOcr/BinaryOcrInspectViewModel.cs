@@ -58,6 +58,9 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
     private OcrSubtitleItem? _ocrSubtitleItem;
     private int _maxWrongPixels;
     private BinaryOcrAddHistoryManager _binaryOcrAddHistoryManager;
+    private NikseBitmap2? _currentPreviewBitmap;
+    private SKRect _currentSentenceRect;
+    private int _currentPreviewTopMargin;
     private bool _isControlDown = false;
     private bool _isWinDown = false;
 
@@ -88,6 +91,9 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
         _nBmp = new NikseBitmap2(1, 1);
         _ocrSubtitleItem = null;
         _binaryOcrAddHistoryManager = new BinaryOcrAddHistoryManager();
+        _currentPreviewBitmap = null;
+        _currentSentenceRect = SKRect.Empty;
+        _currentPreviewTopMargin = 0;
         SentenceBitmap = new SKBitmap(1, 1, true).ToAvaloniaBitmap();
         CurrentBitmap = new SKBitmap(1, 1, true).ToAvaloniaBitmap();
         _splitItem = new ImageSplitterItem2(string.Empty);
@@ -129,9 +135,8 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
     private void InitSentenceBitmap()
     {
         var skBitmap = _sentenceBitmapOriginal.Copy();
-        if (_splitItem.NikseBitmap != null)
+        if (!_currentSentenceRect.IsEmpty)
         {
-            var rect = new SKRect(_splitItem.X, _splitItem.Y, _splitItem.X + _splitItem.NikseBitmap.Width, _splitItem.Y + _splitItem.NikseBitmap.Height);
             using (var canvas = new SKCanvas(skBitmap))
             {
                 using (var paint = new SKPaint
@@ -142,12 +147,65 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
                     IsAntialias = true
                 })
                 {
-                    canvas.DrawRect(rect, paint);
+                    canvas.DrawRect(_currentSentenceRect, paint);
                 }
             }
         }
 
         SentenceBitmap = skBitmap.ToAvaloniaBitmap();
+    }
+
+    private ExpandedOcrGroup? GetExpandedGroup(int index, BinaryOcrMatcher.CompareMatch? match)
+    {
+        return match is { ExpandCount: > 1 }
+            ? ExpandedOcrGroup.Create(_nBmp, _letters, index, match.ExpandCount)
+            : null;
+    }
+
+    private void SetCurrentPreview(int index, BinaryOcrMatcher.CompareMatch? match)
+    {
+        var expandedGroup = GetExpandedGroup(index, match);
+        if (expandedGroup != null)
+        {
+            _currentPreviewBitmap = expandedGroup.PreviewBitmap;
+            _currentPreviewTopMargin = expandedGroup.PreviewTopMargin;
+            _currentSentenceRect = new SKRect(
+                expandedGroup.Bounds.Left,
+                expandedGroup.Bounds.Top,
+                expandedGroup.Bounds.Right,
+                expandedGroup.Bounds.Bottom);
+            CurrentBitmap = expandedGroup.PreviewBitmap.GetBitmap().ToAvaloniaBitmap();
+            ResolutionAndTopMargin = string.Format(
+                Se.Language.Ocr.ResolutionXYAndTopmarginZ,
+                expandedGroup.PreviewBitmap.Width,
+                expandedGroup.PreviewBitmap.Height,
+                expandedGroup.PreviewTopMargin);
+            return;
+        }
+
+        if (_splitItem.NikseBitmap == null)
+        {
+            _currentPreviewBitmap = null;
+            _currentPreviewTopMargin = 0;
+            _currentSentenceRect = SKRect.Empty;
+            CurrentBitmap = new SKBitmap(1, 1, true).ToAvaloniaBitmap();
+            ResolutionAndTopMargin = string.Empty;
+            return;
+        }
+
+        _currentPreviewBitmap = _splitItem.NikseBitmap;
+        _currentPreviewTopMargin = _splitItem.Top;
+        _currentSentenceRect = new SKRect(
+            _splitItem.X,
+            _splitItem.Y,
+            _splitItem.X + _splitItem.NikseBitmap.Width,
+            _splitItem.Y + _splitItem.NikseBitmap.Height);
+        CurrentBitmap = _splitItem.NikseBitmap.GetBitmap().ToAvaloniaBitmap();
+        ResolutionAndTopMargin = string.Format(
+            Se.Language.Ocr.ResolutionXYAndTopmarginZ,
+            _splitItem.NikseBitmap.Width,
+            _splitItem.NikseBitmap.Height,
+            _splitItem.Top);
     }
 
     [RelayCommand]
@@ -263,8 +321,8 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
 
         if (addVm.OkPressed && addVm.BinaryOcrBitmap != null)
         {
-            var letterBitmap = _letters[LetterIndex].NikseBitmap;
-            _binaryOcrAddHistoryManager.Add(addVm.BinaryOcrBitmap, letterBitmap, 0);
+            var previewBitmap = addVm.PreviewBitmap ?? _letters[LetterIndex].NikseBitmap;
+            _binaryOcrAddHistoryManager.Add(addVm.BinaryOcrBitmap, previewBitmap, addVm.PreviewTopMargin, 0);
             _db.Add(addVm.BinaryOcrBitmap);
             _ = Task.Run(_db.Save);
             ReloadMatches();
@@ -415,7 +473,15 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
 
             if (dbBitmap != null)
             {
-                MatchResolutionAndTopMargin = string.Format(Se.Language.Ocr.ResolutionXYAndTopmarginZ, dbBitmap.Width, dbBitmap.Height, dbBitmap.Y);
+                var expandedGroup = GetExpandedGroup(index, match);
+                if (expandedGroup != null)
+                {
+                    MatchResolutionAndTopMargin = string.Format(Se.Language.Ocr.ResolutionXYAndTopmarginZ, expandedGroup.PreviewBitmap.Width, expandedGroup.PreviewBitmap.Height, expandedGroup.PreviewTopMargin);
+                }
+                else
+                {
+                    MatchResolutionAndTopMargin = string.Format(Se.Language.Ocr.ResolutionXYAndTopmarginZ, dbBitmap.Width, dbBitmap.Height, dbBitmap.Y);
+                }
             }
             else
             {
@@ -439,9 +505,7 @@ public partial class BinaryOcrInspectViewModel : ObservableObject
 
             NewText = match?.Text ?? string.Empty;
             IsNewTextItalic = match is { Italic: true };
-            ResolutionAndTopMargin = string.Format(Se.Language.Ocr.ResolutionXYAndTopmarginZ, _splitItem.NikseBitmap.Width, _splitItem.NikseBitmap.Height, _splitItem.Top);
-
-            CurrentBitmap = _splitItem.NikseBitmap!.GetBitmap().ToAvaloniaBitmap();
+            SetCurrentPreview(index, match);
         }
 
         InitSentenceBitmap();
