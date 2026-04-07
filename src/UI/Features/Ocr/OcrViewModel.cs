@@ -459,7 +459,7 @@ public partial class OcrViewModel : ObservableObject
         }
 
         var result = await _windowService.ShowDialogAsync<AddToNamesListWindow, AddToNamesListViewModel>(Window,
-            vm => { vm.Initialize(selectedWord.Word.Word, Dictionaries.ToList(), SelectedDictionary); });
+            vm => { vm.Initialize(selectedWord.DisplayWord, Dictionaries.ToList(), SelectedDictionary); });
         _isCtrlDown = false;
     }
 
@@ -473,7 +473,7 @@ public partial class OcrViewModel : ObservableObject
         }
 
         var result = await _windowService.ShowDialogAsync<AddToUserDictionaryWindow, AddToUserDictionaryViewModel>(Window!,
-            vm => { vm.Initialize(selectedWord.Word.Word, Dictionaries.ToList(), SelectedDictionary); });
+            vm => { vm.Initialize(selectedWord.DisplayWord, Dictionaries.ToList(), SelectedDictionary); });
         _isCtrlDown = false;
     }
 
@@ -1976,13 +1976,13 @@ public partial class OcrViewModel : ObservableObject
                         }
                         else if (result.AddToNamesListPressed)
                         {
-                            _ocrFixEngine.AddName(unknownWord.Word.Word);
+                            _ocrFixEngine.AddName(unknownWord.ResolveSubmittedWord(result.Word));
                         }
                         else if (result.AddToUserDictionaryPressed)
                         {
                             if (SelectedDictionary != null)
                             {
-                                UserWordsHelper.AddToUserDictionary(unknownWord.Word.Word, SelectedDictionary.GetFiveLetterLanguageName() ?? "en_US");
+                                UserWordsHelper.AddToUserDictionary(unknownWord.ResolveSubmittedWord(result.Word), SelectedDictionary.GetFiveLetterLanguageName() ?? "en_US");
                             }
                         }
                         else
@@ -2335,13 +2335,13 @@ public partial class OcrViewModel : ObservableObject
                         }
                         else if (result.AddToNamesListPressed)
                         {
-                            _ocrFixEngine.AddName(unknownWord.Word.Word);
+                            _ocrFixEngine.AddName(unknownWord.ResolveSubmittedWord(result.Word));
                         }
                         else if (result.AddToUserDictionaryPressed)
                         {
                             if (SelectedDictionary != null)
                             {
-                                UserWordsHelper.AddToUserDictionary(unknownWord.Word.Word, SelectedDictionary.GetFiveLetterLanguageName() ?? "en_US");
+                                UserWordsHelper.AddToUserDictionary(unknownWord.ResolveSubmittedWord(result.Word), SelectedDictionary.GetFiveLetterLanguageName() ?? "en_US");
                             }
                         }
                         else
